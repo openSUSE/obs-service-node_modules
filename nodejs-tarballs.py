@@ -42,7 +42,14 @@ def collect_deps_recursive(d, deps):
         if d:
             path='/'.join((d, path))
         entry = deps[module]
-        if 'resolved' in entry:
+        if 'bundled' in entry and entry['bundled']:
+            continue
+        elif not 'resolved' in entry:
+            if 'from' in entry:
+                logging.warn("entry %s is from unsupported location %s", module, entry['from'])
+            else:
+                logging.warn("entry %s has no download", module)
+        else:
             url = entry['resolved']
             algo, chksum = entry['integrity'].split('-', 2)
             chksum = hexlify(b64decode(chksum)).decode('ascii')
