@@ -19,13 +19,18 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from pprint import pprint
-import os, sys, re
-import logging
-import argparse
-import json
 from base64 import b64decode
 from binascii import hexlify
+from pprint import pprint
+import argparse
+import hashlib
+import json
+import logging
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
 
 # filename -> { url: <string>, sum: <string>, path = set([<string>, ..]) }
 module_map = dict()
@@ -39,7 +44,8 @@ def collect_deps_recursive(d, deps):
         entry = deps[module]
         if 'resolved' in entry:
             url = entry['resolved']
-            sum = entry['integrity']
+            algo, chksum = entry['integrity'].split('-', 2)
+            chksum = hexlify(b64decode(chksum)).decode('ascii')
             fn = os.path.basename(url)
             # looks like some module are from some kind of branch and may
             # use the same file name. So prefix with this namespace.
@@ -47,10 +53,12 @@ def collect_deps_recursive(d, deps):
                 fn = module.split('/')[0] + '-' + fn
             if fn in module_map:
                 if module_map[fn]['url'] != url \
-                    or module_map[fn]['sum'] != sum:
-                    logging.error("%s: mismatch %s <> %s, %s <> %s", module, module_map[fn]['url'], url, module_map[fn]['sum'], sum)
+                    or module_map[fn]['algo'] != algo \
+                    or module_map[fn]['chksum'] != chksum:
+                        logging.error("%s: mismatch %s <> %s, %s:%s <> %s:%s", module, module_map[fn]['url'], url,
+                            module_map[fn]['algo'], module_map[fn]['chksum'], algo, chksum)
             else:
-                module_map[fn] = { 'url' : url, 'sum': sum }
+                module_map[fn] = { 'url' : url, 'algo': algo, 'chksum': chksum }
 
             module_map[fn].setdefault('path', set()).add(path)
 
@@ -78,13 +86,45 @@ def main(args):
     if args.checksums:
         with open(args.checksums, 'w') as fh:
             for fn in sorted(module_map.keys()):
-                algo, chksum = module_map[fn]['sum'].split('-', 2)
-                fh.write("{} ({}) = {}\n".format(algo.upper(), fn, hexlify(b64decode(chksum)).decode('ascii')))
+                fh.write("{} ({}) = {}\n".format(module_map[fn]['algo'].upper(), fn, module_map[fn]['chksum']))
 
     if args.locations:
         with open(args.locations, 'w') as fh:
             for fn in sorted(module_map.keys()):
                 fh.write("{} {}\n".format(fn, ' '.join(module_map[fn]['path'])))
+
+    if args.download:
+        for fn in sorted(module_map.keys()):
+            url = module_map[fn]['url']
+            req = urllib.request.Request(url)
+            if os.path.exists(fn):
+                if args.download_skip_existing:
+                    logging.info("skipping download of existing %s", fn)
+                    continue
+                stamp = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(os.path.getmtime(fn)))
+                logging.debug("adding If-Modified-Since %s: %s", fn, stamp)
+                req.add_header('If-Modified-Since', stamp)
+
+            logging.info("fetching %s as %s", url, fn)
+            algo = module_map[fn]['algo']
+            chksum = module_map[fn]['chksum']
+            h = hashlib.new(algo)
+            response = urllib.request.urlopen(req)
+            try:
+                data = response.read()
+                h.update(data)
+                if h.hexdigest() != chksum:
+                    logging.error("checksum failure for %s %s %s %s", fn, algo, h.hexdigest, chksum)
+                else:
+                    try:
+                        fh = open(fn+".new", 'wb')
+                        fh.write(data)
+                    except OSError as e:
+                        logging.error(e)
+                    finally:
+                        os.rename(fn+".new", fn)
+            except urllib.error.HTTPError as e:
+                logging.error(e)
 
     return 0
 
@@ -97,6 +137,8 @@ if __name__ == '__main__':
     parser.add_argument("-o", "--output", metavar="FILE", help="spec files source lines into that file")
     parser.add_argument("--checksums", metavar="FILE", help="Write BSD style checksum file")
     parser.add_argument("--locations", metavar="FILE", help="Write locations into that file")
+    parser.add_argument("--download", action="store_true", help="download files")
+    parser.add_argument("--download-skip-existing", action="store_true", help="don't download existing files again")
 
     args = parser.parse_args()
 
