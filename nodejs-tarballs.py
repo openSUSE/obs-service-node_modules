@@ -31,6 +31,8 @@ import sys
 import time
 import urllib.error
 import urllib.request
+import urllib.parse
+import subprocess
 
 # filename -> { url: <string>, sum: <string>, path = set([<string>, ..]) }
 module_map = dict()
@@ -46,7 +48,28 @@ def collect_deps_recursive(d, deps):
             continue
         elif not 'resolved' in entry:
             if 'from' in entry:
-                logging.warn("entry %s is from unsupported location %s", module, entry['from'])
+                o = urllib.parse.urlparse(entry['from'])
+                if o.scheme in ('git+http', 'git+https'):
+                    scheme = o.scheme.split('+')[1]
+                    branch = 'master'
+                    if o.fragment:
+                        branch = o.fragment
+                    p = os.path.basename(o.path)
+                    if p.endswith('.git'):
+                        p = p[:-4]
+                    fn = "{}-{}.tgz".format(p, branch)
+                    module_map[fn] = {
+                            'scm': 'git',
+                            'branch': branch,
+                            'basename': p,
+                            'url' : urllib.parse.urlunparse((scheme, o.netloc, o.path, o.params, o.query, None))
+                            }
+
+                    module_map[fn].setdefault('path', set()).add(path)
+
+                else:
+                    logging.warn("entry %s is from unsupported location %s", module, entry['from'])
+
             else:
                 logging.warn("entry %s has no download", module)
         else:
@@ -98,40 +121,63 @@ def main(args):
     if args.locations:
         with open(args.locations, 'w') as fh:
             for fn in sorted(module_map.keys()):
-                fh.write("{} {}\n".format(fn, ' '.join(module_map[fn]['path'])))
+                fh.write("{} {}\n".format(fn, ' '.join(sorted(module_map[fn]['path']))))
 
     if args.download:
         for fn in sorted(module_map.keys()):
             url = module_map[fn]['url']
-            req = urllib.request.Request(url)
-            if os.path.exists(fn):
-                if args.download_skip_existing:
-                    logging.info("skipping download of existing %s", fn)
-                    continue
-                stamp = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(os.path.getmtime(fn)))
-                logging.debug("adding If-Modified-Since %s: %s", fn, stamp)
-                req.add_header('If-Modified-Since', stamp)
-
-            logging.info("fetching %s as %s", url, fn)
-            algo = module_map[fn]['algo']
-            chksum = module_map[fn]['chksum']
-            h = hashlib.new(algo)
-            response = urllib.request.urlopen(req)
-            try:
-                data = response.read()
-                h.update(data)
-                if h.hexdigest() != chksum:
-                    logging.error("checksum failure for %s %s %s %s", fn, algo, h.hexdigest, chksum)
+            if 'scm' in module_map[fn]:
+                d = module_map[fn]['basename']
+                if os.path.exists(d):
+                    r = subprocess.run(['git', 'remote', 'update'], cwd=d)
+                    if r.returncode:
+                        logging.error("failed to clone %s", url)
+                        continue
                 else:
-                    try:
-                        fh = open(fn+".new", 'wb')
-                        fh.write(data)
-                    except OSError as e:
-                        logging.error(e)
-                    finally:
-                        os.rename(fn+".new", fn)
-            except urllib.error.HTTPError as e:
-                logging.error(e)
+                    r = subprocess.run(['git', 'clone', '--bare', url, d])
+                    if r.returncode:
+                        logging.error("failed to clone %s", url)
+                        continue
+                r = subprocess.run([
+                        'git', 'archive',
+                        '--format=tar.gz',
+                        '-o', '../'+fn,
+                        '--prefix', 'package/', module_map[fn]['branch']
+                        ],
+                        cwd=d)
+                if r.returncode:
+                    logging.error("failed to create tar %s", url)
+                    continue
+            else:
+                req = urllib.request.Request(url)
+                if os.path.exists(fn):
+                    if args.download_skip_existing:
+                        logging.info("skipping download of existing %s", fn)
+                        continue
+                    stamp = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(os.path.getmtime(fn)))
+                    logging.debug("adding If-Modified-Since %s: %s", fn, stamp)
+                    req.add_header('If-Modified-Since', stamp)
+
+                logging.info("fetching %s as %s", url, fn)
+                algo = module_map[fn]['algo']
+                chksum = module_map[fn]['chksum']
+                h = hashlib.new(algo)
+                response = urllib.request.urlopen(req)
+                try:
+                    data = response.read()
+                    h.update(data)
+                    if h.hexdigest() != chksum:
+                        logging.error("checksum failure for %s %s %s %s", fn, algo, h.hexdigest, chksum)
+                    else:
+                        try:
+                            fh = open(fn+".new", 'wb')
+                            fh.write(data)
+                        except OSError as e:
+                            logging.error(e)
+                        finally:
+                            os.rename(fn+".new", fn)
+                except urllib.error.HTTPError as e:
+                    logging.error(e)
 
     return 0
 
