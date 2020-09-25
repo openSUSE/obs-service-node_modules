@@ -19,132 +19,158 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from base64 import b64decode
-from binascii import hexlify
-from pprint import pprint
 import argparse
 import hashlib
 import json
 import logging
 import os
+import subprocess
 import sys
 import time
 import urllib.error
-import urllib.request
 import urllib.parse
-import subprocess
+import urllib.request
+from base64 import b64decode
+from binascii import hexlify
+
 
 # filename -> { url: <string>, sum: <string>, path = set([<string>, ..]) }
-module_map = dict()
+MODULE_MAP = dict()
+
 
 def collect_deps_recursive(d, deps):
-
-    for module in sorted(deps.keys()):
-        path='/'.join(('node_modules', module))
+    for module in sorted(deps):
+        path = "/".join(("node_modules", module))
         if d:
-            path='/'.join((d, path))
+            path = "/".join((d, path))
         entry = deps[module]
-        if 'bundled' in entry and entry['bundled']:
+        if "bundled" in entry and entry["bundled"]:
             continue
-        elif not 'resolved' in entry:
-            if 'from' in entry:
-                o = urllib.parse.urlparse(entry['from'])
-                if o.scheme in ('git+http', 'git+https'):
-                    scheme = o.scheme.split('+')[1]
-                    branch = 'master'
+        elif "resolved" not in entry:
+            if "from" in entry:
+                o = urllib.parse.urlparse(entry["from"])
+                if o.scheme in ("git+http", "git+https"):
+                    _, scheme = o.scheme.split("+")
+                    branch = "master"
                     if o.fragment:
                         branch = o.fragment
                     p = os.path.basename(o.path)
-                    if p.endswith('.git'):
+                    if p.endswith(".git"):
                         p = p[:-4]
                     fn = "{}-{}.tgz".format(p, branch)
-                    module_map[fn] = {
-                            'scm': 'git',
-                            'branch': branch,
-                            'basename': p,
-                            'url' : urllib.parse.urlunparse((scheme, o.netloc, o.path, o.params, o.query, None))
-                            }
+                    MODULE_MAP[fn] = {
+                        "scm": "git",
+                        "branch": branch,
+                        "basename": p,
+                        "url": urllib.parse.urlunparse(
+                            (scheme, o.netloc, o.path, o.params, o.query, None)
+                        ),
+                    }
 
-                    module_map[fn].setdefault('path', set()).add(path)
+                    MODULE_MAP[fn].setdefault("path", set()).add(path)
 
                 else:
-                    logging.warn("entry %s is from unsupported location %s", module, entry['from'])
+                    logging.warning(
+                        "entry %s is from unsupported location %s",
+                        module,
+                        entry["from"],
+                    )
 
             else:
-                logging.warn("entry %s has no download", module)
+                logging.warning("entry %s has no download", module)
         else:
-            url = entry['resolved']
-            algo, chksum = entry['integrity'].split('-', 2)
-            chksum = hexlify(b64decode(chksum)).decode('ascii')
+            url = entry["resolved"]
+            algo, chksum = entry["integrity"].split("-", 2)
+            chksum = hexlify(b64decode(chksum)).decode("ascii")
             fn = os.path.basename(url)
-            # looks like some module are from some kind of branch and may
-            # use the same file name. So prefix with this namespace.
-            if '/' in module:
-                fn = module.split('/')[0] + '-' + fn
-            if fn in module_map:
-                if module_map[fn]['url'] != url \
-                    or module_map[fn]['algo'] != algo \
-                    or module_map[fn]['chksum'] != chksum:
-                        logging.error("%s: mismatch %s <> %s, %s:%s <> %s:%s", module, module_map[fn]['url'], url,
-                            module_map[fn]['algo'], module_map[fn]['chksum'], algo, chksum)
+            # looks like some module are from some kind of branch and
+            # may use the same file name. So prefix with this
+            # namespace.
+            if "/" in module:
+                fn = module.split("/")[0] + "-" + fn
+            if fn in MODULE_MAP:
+                if (
+                    MODULE_MAP[fn]["url"] != url
+                    or MODULE_MAP[fn]["algo"] != algo
+                    or MODULE_MAP[fn]["chksum"] != chksum
+                ):
+                    logging.error(
+                        "%s: mismatch %s <> %s, %s:%s <> %s:%s",
+                        module,
+                        MODULE_MAP[fn]["url"],
+                        url,
+                        MODULE_MAP[fn]["algo"],
+                        MODULE_MAP[fn]["chksum"],
+                        algo,
+                        chksum,
+                    )
             else:
-                module_map[fn] = { 'url' : url, 'algo': algo, 'chksum': chksum }
+                MODULE_MAP[fn] = {"url": url, "algo": algo, "chksum": chksum}
 
-            module_map[fn].setdefault('path', set()).add(path)
+            MODULE_MAP[fn].setdefault("path", set()).add(path)
 
-        if 'dependencies' in entry:
-            collect_deps_recursive(path, entry['dependencies'])
+        if "dependencies" in entry:
+            collect_deps_recursive(path, entry["dependencies"])
+
 
 def main(args):
+    logging.info("main")
 
-    # do some work here
-    logger = logging.getLogger("boilerplate")
-    logger.info("main")
-
-    with open(args.input, 'r') as fh:
+    with open(args.input) as fh:
         js = json.load(fh)
-        if 'dependencies' in js:
-            collect_deps_recursive('', js['dependencies'])
+
+    if "dependencies" in js:
+        collect_deps_recursive("", js["dependencies"])
 
     if args.output:
-        with open(args.output, 'w') as fh:
+        with open(args.output, "w") as fh:
             i = 100
-            for fn in sorted(module_map.keys()):
-                fh.write("Source{}:     {}#/{}\n".format(i, module_map[fn]['url'], fn))
+            for fn in sorted(MODULE_MAP):
+                fh.write("Source{}:     {}#/{}\n".format(i, MODULE_MAP[fn]["url"], fn))
                 i += 1
 
     if args.checksums:
-        with open(args.checksums, 'w') as fh:
-            for fn in sorted(module_map.keys()):
-                fh.write("{} ({}) = {}\n".format(module_map[fn]['algo'].upper(), fn, module_map[fn]['chksum']))
+        with open(args.checksums, "w") as fh:
+            for fn in sorted(MODULE_MAP):
+                fh.write(
+                    "{} ({}) = {}\n".format(
+                        MODULE_MAP[fn]["algo"].upper(), fn, MODULE_MAP[fn]["chksum"]
+                    )
+                )
 
     if args.locations:
-        with open(args.locations, 'w') as fh:
-            for fn in sorted(module_map.keys()):
-                fh.write("{} {}\n".format(fn, ' '.join(sorted(module_map[fn]['path']))))
+        with open(args.locations, "w") as fh:
+            for fn in sorted(MODULE_MAP):
+                fh.write("{} {}\n".format(fn, " ".join(sorted(MODULE_MAP[fn]["path"]))))
 
     if args.download:
-        for fn in sorted(module_map.keys()):
-            url = module_map[fn]['url']
-            if 'scm' in module_map[fn]:
-                d = module_map[fn]['basename']
+        for fn in sorted(MODULE_MAP):
+            url = MODULE_MAP[fn]["url"]
+            if "scm" in MODULE_MAP[fn]:
+                d = MODULE_MAP[fn]["basename"]
                 if os.path.exists(d):
-                    r = subprocess.run(['git', 'remote', 'update'], cwd=d)
+                    r = subprocess.run(["git", "remote", "update"], cwd=d)
                     if r.returncode:
                         logging.error("failed to clone %s", url)
                         continue
                 else:
-                    r = subprocess.run(['git', 'clone', '--bare', url, d])
+                    r = subprocess.run(["git", "clone", "--bare", url, d])
                     if r.returncode:
                         logging.error("failed to clone %s", url)
                         continue
-                r = subprocess.run([
-                        'git', 'archive',
-                        '--format=tar.gz',
-                        '-o', '../'+fn,
-                        '--prefix', 'package/', module_map[fn]['branch']
-                        ],
-                        cwd=d)
+                r = subprocess.run(
+                    [
+                        "git",
+                        "archive",
+                        "--format=tar.gz",
+                        "-o",
+                        "../" + fn,
+                        "--prefix",
+                        "package/",
+                        MODULE_MAP[fn]["branch"],
+                    ],
+                    cwd=d,
+                )
                 if r.returncode:
                     logging.error("failed to create tar %s", url)
                     continue
@@ -154,55 +180,82 @@ def main(args):
                     if args.download_skip_existing:
                         logging.info("skipping download of existing %s", fn)
                         continue
-                    stamp = time.strftime('%a, %d %b %Y %H:%M:%S GMT', time.gmtime(os.path.getmtime(fn)))
+                    stamp = time.strftime(
+                        "%a, %d %b %Y %H:%M:%S GMT", time.gmtime(os.path.getmtime(fn))
+                    )
                     logging.debug("adding If-Modified-Since %s: %s", fn, stamp)
-                    req.add_header('If-Modified-Since', stamp)
+                    req.add_header("If-Modified-Since", stamp)
 
                 logging.info("fetching %s as %s", url, fn)
-                algo = module_map[fn]['algo']
-                chksum = module_map[fn]['chksum']
+                algo = MODULE_MAP[fn]["algo"]
+                chksum = MODULE_MAP[fn]["chksum"]
                 h = hashlib.new(algo)
                 response = urllib.request.urlopen(req)
                 try:
                     data = response.read()
                     h.update(data)
                     if h.hexdigest() != chksum:
-                        logging.error("checksum failure for %s %s %s %s", fn, algo, h.hexdigest, chksum)
+                        logging.error(
+                            "checksum failure for %s %s %s %s",
+                            fn,
+                            algo,
+                            h.hexdigest,
+                            chksum,
+                        )
                     else:
                         try:
-                            fh = open(fn+".new", 'wb')
-                            fh.write(data)
+                            with open(fn + ".new", "wb") as fh:
+                                fh.write(data)
                         except OSError as e:
                             logging.error(e)
                         finally:
-                            os.rename(fn+".new", fn)
+                            os.rename(fn + ".new", fn)
                 except urllib.error.HTTPError as e:
                     logging.error(e)
 
     return 0
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='boilerplate python commmand line program')
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="boilerplate python commmand line program"
+    )
     parser.add_argument("--dry", action="store_true", help="dry run")
     parser.add_argument("--debug", action="store_true", help="debug output")
     parser.add_argument("--verbose", action="store_true", help="verbose")
-    parser.add_argument("-i", "--input", metavar="FILE", default="package-lock.json", help="input package lock file")
-    parser.add_argument("-o", "--output", metavar="FILE", help="spec files source lines into that file")
-    parser.add_argument("--checksums", metavar="FILE", help="Write BSD style checksum file")
-    parser.add_argument("--locations", metavar="FILE", help="Write locations into that file")
+    parser.add_argument(
+        "-i",
+        "--input",
+        metavar="FILE",
+        default="package-lock.json",
+        help="input package lock file",
+    )
+    parser.add_argument(
+        "-o", "--output", metavar="FILE", help="spec files source lines into that file"
+    )
+    parser.add_argument(
+        "--checksums", metavar="FILE", help="Write BSD style checksum file"
+    )
+    parser.add_argument(
+        "--locations", metavar="FILE", help="Write locations into that file"
+    )
     parser.add_argument("--download", action="store_true", help="download files")
-    parser.add_argument("--download-skip-existing", action="store_true", help="don't download existing files again")
+    parser.add_argument(
+        "--download-skip-existing",
+        action="store_true",
+        help="don't download existing files again",
+    )
 
     args = parser.parse_args()
 
     if args.debug:
-        level  = logging.DEBUG
+        level = logging.DEBUG
     elif args.verbose:
         level = logging.INFO
     else:
-        level = None
+        level = logging.WARNING
 
-    logging.basicConfig(level = level)
+    logging.basicConfig(format='%(levelname)s:%(message)s', level=level)
 
     sys.exit(main(args))
 
