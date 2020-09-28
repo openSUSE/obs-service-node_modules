@@ -38,6 +38,12 @@ from binascii import hexlify
 MODULE_MAP = dict()
 
 
+def update_checksum(fn):
+    with open(fn, 'rb') as fh:
+        h = hashlib.new(MODULE_MAP[fn].setdefault("algo", 'sha256'), fh.read())
+        MODULE_MAP[fn]["chksum"] = h.hexdigest()
+
+
 def collect_deps_recursive(d, deps):
     for module in sorted(deps):
         path = "/".join(("node_modules", module))
@@ -129,15 +135,6 @@ def main(args):
                 fh.write("Source{}:     {}#/{}\n".format(i, MODULE_MAP[fn]["url"], fn))
                 i += 1
 
-    if args.checksums:
-        with open(args.checksums, "w") as fh:
-            for fn in sorted(MODULE_MAP):
-                fh.write(
-                    "{} ({}) = {}\n".format(
-                        MODULE_MAP[fn]["algo"].upper(), fn, MODULE_MAP[fn]["chksum"]
-                    )
-                )
-
     if args.locations:
         with open(args.locations, "w") as fh:
             for fn in sorted(MODULE_MAP):
@@ -145,6 +142,8 @@ def main(args):
 
     if args.download:
         for fn in sorted(MODULE_MAP):
+            if args.file and fn not in args.file:
+                continue
             url = MODULE_MAP[fn]["url"]
             if "scm" in MODULE_MAP[fn]:
                 d = MODULE_MAP[fn]["basename"]
@@ -213,6 +212,17 @@ def main(args):
                 except urllib.error.HTTPError as e:
                     logging.error(e)
 
+    if args.checksums:
+        with open(args.checksums, "w") as fh:
+            for fn in sorted(MODULE_MAP):
+                if 'algo' not in MODULE_MAP[fn]:
+                    update_checksum(fn)
+                fh.write(
+                    "{} ({}) = {}\n".format(
+                        MODULE_MAP[fn]["algo"].upper(), fn, MODULE_MAP[fn]["chksum"]
+                    )
+                )
+
     return 0
 
 
@@ -229,6 +239,9 @@ if __name__ == "__main__":
         metavar="FILE",
         default="package-lock.json",
         help="input package lock file",
+    )
+    parser.add_argument(
+        "-f", "--file", nargs="+", metavar="FILE", help="limit to file"
     )
     parser.add_argument(
         "-o", "--output", metavar="FILE", help="spec files source lines into that file"
