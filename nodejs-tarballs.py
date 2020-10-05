@@ -264,8 +264,14 @@ def main(args):
                 ET.SubElement(s, 'param', { 'name': 'version'}).text = MODULE_MAP[fn]["branch"]
             else:
                 s = ET.SubElement(root, 'service', { 'name': 'download_url'})
-                ET.SubElement(s, 'param', { 'name': 'url'}).text = MODULE_MAP[fn]["url"]
-                ET.SubElement(s, 'param', { 'name': 'prefer-old'}).text = 'enable'
+                if False:
+                    ET.SubElement(s, 'param', { 'name': 'url'}).text = MODULE_MAP[fn]["url"]
+                    ET.SubElement(s, 'param', { 'name': 'prefer-old'}).text = 'enable'
+                else:
+                    o = urllib.parse.urlparse(MODULE_MAP[fn]["url"])
+                    ET.SubElement(s, 'param', { 'name': 'protocol'}).text = o.scheme
+                    ET.SubElement(s, 'param', { 'name': 'host'}).text = o.netloc
+                    ET.SubElement(s, 'param', { 'name': 'path'}).text = o.path
 
         tree.write(args.obs_service, pretty_print=True)
 
