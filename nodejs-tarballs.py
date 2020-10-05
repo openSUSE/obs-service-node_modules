@@ -32,6 +32,7 @@ import urllib.parse
 import urllib.request
 from base64 import b64decode
 from binascii import hexlify
+from lxml import etree as ET
 
 
 # filename -> { url: <string>, sum: <string>, path = set([<string>, ..]) }
@@ -223,6 +224,32 @@ def main(args):
                     )
                 )
 
+    if args.obs_service:
+        parser = ET.XMLParser(remove_blank_text=True)
+        tree = ET.parse(args.obs_service, parser)
+        root = tree.getroot()
+        # to make sure pretty printing works
+        for element in root.iter():
+            element.tail = None
+
+        # FIXME: remove only entries we added?
+        for node in root.findall("service[@name='download_url']"):
+            root.remove(node)
+
+        for fn in sorted(MODULE_MAP):
+            if args.file and fn not in args.file:
+                continue
+            url = MODULE_MAP[fn]["url"]
+            if "scm" in MODULE_MAP[fn]:
+                # XXX: use obs_scm
+                continue
+            else:
+                s = ET.SubElement(root, 'service', { 'name': 'download_url'})
+                ET.SubElement(s, 'param', { 'name': 'url'}).text = MODULE_MAP[fn]["url"]
+                ET.SubElement(s, 'param', { 'name': 'prefer-old'}).text = 'enable'
+
+        tree.write(args.obs_service, pretty_print=True)
+
     return 0
 
 
@@ -251,6 +278,9 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--locations", metavar="FILE", help="Write locations into that file"
+    )
+    parser.add_argument(
+        "--obs-service", metavar="FILE", help="OBS service file for download_url"
     )
     parser.add_argument("--download", action="store_true", help="download files")
     parser.add_argument(
