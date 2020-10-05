@@ -38,6 +38,8 @@ from lxml import etree as ET
 # filename -> { url: <string>, sum: <string>, path = set([<string>, ..]) }
 MODULE_MAP = dict()
 
+# this is a hack for obs_scm integration
+OBS_SCM_COMPRESSION = None
 
 def update_checksum(fn):
     with open(fn, 'rb') as fh:
@@ -59,12 +61,16 @@ def collect_deps_recursive(d, deps):
                 if o.scheme in ("git+http", "git+https"):
                     _, scheme = o.scheme.split("+")
                     branch = "master"
+                    # XXX: not sure that is correct
                     if o.fragment:
                         branch = o.fragment
                     p = os.path.basename(o.path)
                     if p.endswith(".git"):
                         p = p[:-4]
-                    fn = "{}-{}.tgz".format(p, branch)
+                    if OBS_SCM_COMPRESSION:
+                        fn = "{}-{}.tar.{}".format(p, branch, OBS_SCM_COMPRESSION)
+                    else:
+                        fn = "{}-{}.tgz".format(p, branch)
                     MODULE_MAP[fn] = {
                         "scm": "git",
                         "branch": branch,
@@ -236,13 +242,26 @@ def main(args):
         for node in root.findall("service[@name='download_url']"):
             root.remove(node)
 
+        tar_scm_toremove = set()
+        for fn in sorted(MODULE_MAP):
+            if "scm" in MODULE_MAP[fn]:
+                tar_scm_toremove.add(MODULE_MAP[fn]['url'])
+
+        for u in tar_scm_toremove:
+            for node in root.findall("service[@name='obs_scm']"):
+                if node.find("param[@name='url']").text == u:
+                    root.remove(node)
+
         for fn in sorted(MODULE_MAP):
             if args.file and fn not in args.file:
                 continue
             url = MODULE_MAP[fn]["url"]
             if "scm" in MODULE_MAP[fn]:
-                # XXX: use obs_scm
-                continue
+                s = ET.SubElement(root, 'service', { 'name': 'obs_scm'})
+                ET.SubElement(s, 'param', { 'name': 'scm'}).text = "git"
+                ET.SubElement(s, 'param', { 'name': 'url'}).text = MODULE_MAP[fn]["url"]
+                ET.SubElement(s, 'param', { 'name': 'revision'}).text = MODULE_MAP[fn]["branch"]
+                ET.SubElement(s, 'param', { 'name': 'version'}).text = MODULE_MAP[fn]["branch"]
             else:
                 s = ET.SubElement(root, 'service', { 'name': 'download_url'})
                 ET.SubElement(s, 'param', { 'name': 'url'}).text = MODULE_MAP[fn]["url"]
@@ -299,6 +318,9 @@ if __name__ == "__main__":
         level = logging.WARNING
 
     logging.basicConfig(format='%(levelname)s:%(message)s', level=level)
+
+    if args.obs_service:
+        OBS_SCM_COMPRESSION = 'xz'
 
     sys.exit(main(args))
 
