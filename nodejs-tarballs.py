@@ -125,6 +125,12 @@ def collect_deps_recursive(d, deps):
         if "dependencies" in entry:
             collect_deps_recursive(path, entry["dependencies"])
 
+def write_rpm_sources(fh, args):
+    i = args.source_offset if args.source_offset is not None else ''
+    for fn in sorted(MODULE_MAP):
+        fh.write("Source{}:         {}#/{}\n".format(i, MODULE_MAP[fn]["url"], fn))
+        if args.source_offset is not None:
+            i += 1
 
 def main(args):
     logging.info("main")
@@ -137,10 +143,21 @@ def main(args):
 
     if args.output:
         with open(args.output, "w") as fh:
-            i = 100
-            for fn in sorted(MODULE_MAP):
-                fh.write("Source{}:     {}#/{}\n".format(i, MODULE_MAP[fn]["url"], fn))
-                i += 1
+            write_rpm_sources(fh, args)
+
+    if args.spec:
+        with open(args.spec + ".new", "w") as ofh:
+            with open(args.spec, "r") as ifh:
+                for line in ifh:
+                    if line.startswith('# NODE_MODULES BEGIN'):
+                        ofh.write(line)
+                        for line in ifh:
+                            if line.startswith('# NODE_MODULES END'):
+                                write_rpm_sources(ofh, args)
+                                break
+
+                    ofh.write(line)
+        os.rename(args.spec+".new", args.spec)
 
     if args.locations:
         with open(args.locations, "w") as fh:
@@ -238,9 +255,10 @@ def main(args):
         for element in root.iter():
             element.tail = None
 
-        # FIXME: remove only entries we added?
-        for node in root.findall("service[@name='download_url']"):
-            root.remove(node)
+        if not args.obs_service_scm_only:
+            # FIXME: remove only entries we added?
+            for node in root.findall("service[@name='download_url']"):
+                root.remove(node)
 
         tar_scm_toremove = set()
         for fn in sorted(MODULE_MAP):
@@ -262,7 +280,7 @@ def main(args):
                 ET.SubElement(s, 'param', { 'name': 'url'}).text = MODULE_MAP[fn]["url"]
                 ET.SubElement(s, 'param', { 'name': 'revision'}).text = MODULE_MAP[fn]["branch"]
                 ET.SubElement(s, 'param', { 'name': 'version'}).text = MODULE_MAP[fn]["branch"]
-            else:
+            elif not args.obs_service_scm_only:
                 s = ET.SubElement(root, 'service', { 'name': 'download_url'})
                 if False:
                     ET.SubElement(s, 'param', { 'name': 'url'}).text = MODULE_MAP[fn]["url"]
@@ -299,6 +317,12 @@ if __name__ == "__main__":
         "-o", "--output", metavar="FILE", help="spec files source lines into that file"
     )
     parser.add_argument(
+        "--spec", metavar="FILE", help="spec file to process"
+    )
+    parser.add_argument(
+        "--source-offset", metavar="N", type=int, help="Spec file source offset"
+    )
+    parser.add_argument(
         "--checksums", metavar="FILE", help="Write BSD style checksum file"
     )
     parser.add_argument(
@@ -307,6 +331,12 @@ if __name__ == "__main__":
     parser.add_argument(
         "--obs-service", metavar="FILE", help="OBS service file for download_url"
     )
+    parser.add_argument(
+        "--obs-service-scm-only",
+        action="store_true",
+        help="only generate tar_scm entries in service file",
+    )
+
     parser.add_argument("--download", action="store_true", help="download files")
     parser.add_argument(
         "--download-skip-existing",
@@ -325,8 +355,11 @@ if __name__ == "__main__":
 
     logging.basicConfig(format='%(levelname)s:%(message)s', level=level)
 
-    if args.obs_service:
+    if args.obs_service or args.spec:
         OBS_SCM_COMPRESSION = 'xz'
+        if args.download:
+            logging.error("can't have download and service/spec at the same time")
+            sys.exit(1)
 
     sys.exit(main(args))
 
