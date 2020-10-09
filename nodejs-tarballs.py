@@ -24,6 +24,7 @@ import hashlib
 import json
 import logging
 import os
+import glob
 import subprocess
 import sys
 import time
@@ -40,6 +41,7 @@ MODULE_MAP = dict()
 
 # this is a hack for obs_scm integration
 OBS_SCM_COMPRESSION = None
+
 
 def update_checksum(fn):
     with open(fn, 'rb') as fh:
@@ -135,6 +137,25 @@ def write_rpm_sources(fh, args):
 def main(args):
     logging.info("main")
 
+    # special settings when run as obs service
+    if args.outdir:
+        if not args.spec:
+            specfiles = glob.glob('*.spec')
+            if specfiles:
+                if len(specfiles) > 1:
+                    raise Exception("more than one spec file found. Choose one")
+                args.spec = specfiles[0]
+            else:
+                raise Exception("This service needs a spec file to operate with")
+
+        if not args.locations:
+            args.locations = 'node_modules.loc'
+
+        if not args.checksums:
+            args.checksums = 'node_modules.sums'
+
+        args.download = True
+
     def _out(fn):
         return os.path.join(args.outdir, fn) if args.outdir else fn
 
@@ -182,6 +203,7 @@ def main(args):
             url = MODULE_MAP[fn]["url"]
             if "scm" in MODULE_MAP[fn]:
                 d = MODULE_MAP[fn]["basename"]
+                # TODO: use same cache as tar_scm
                 if os.path.exists(d):
                     r = subprocess.run(["git", "remote", "update"], cwd=d)
                     if r.returncode:
