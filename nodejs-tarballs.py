@@ -43,12 +43,6 @@ MODULE_MAP = dict()
 OBS_SCM_COMPRESSION = None
 
 
-def update_checksum(fn):
-    with open(fn, 'rb') as fh:
-        h = hashlib.new(MODULE_MAP[fn].setdefault("algo", 'sha256'), fh.read())
-        MODULE_MAP[fn]["chksum"] = h.hexdigest()
-
-
 def collect_deps_recursive(d, deps):
     for module in sorted(deps):
         path = "/".join(("node_modules", module))
@@ -158,6 +152,11 @@ def main(args):
 
     def _out(fn):
         return os.path.join(args.outdir, fn) if args.outdir else fn
+
+    def update_checksum(fn):
+        with open(_out(fn), 'rb') as fh:
+            h = hashlib.new(MODULE_MAP[fn].setdefault("algo", 'sha256'), fh.read())
+            MODULE_MAP[fn]["chksum"] = h.hexdigest()
 
     with open(args.input) as fh:
         js = json.load(fh)
@@ -275,7 +274,7 @@ def main(args):
         with open(_out(args.checksums), "w") as fh:
             for fn in sorted(MODULE_MAP):
                 if 'algo' not in MODULE_MAP[fn]:
-                    update_checksum(_out(fn))
+                    update_checksum(fn)
                 fh.write(
                     "{} ({}) = {}\n".format(
                         MODULE_MAP[fn]["algo"].upper(), fn, MODULE_MAP[fn]["chksum"]
