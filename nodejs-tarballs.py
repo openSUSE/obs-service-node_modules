@@ -135,6 +135,9 @@ def write_rpm_sources(fh, args):
 def main(args):
     logging.info("main")
 
+    def _out(fn):
+        return os.path.join(args.outdir, fn) if args.outdir else fn
+
     with open(args.input) as fh:
         js = json.load(fh)
 
@@ -142,11 +145,15 @@ def main(args):
         collect_deps_recursive("", js["dependencies"])
 
     if args.output:
-        with open(args.output, "w") as fh:
+        with open(_out(args.output), "w") as fh:
             write_rpm_sources(fh, args)
 
     if args.spec:
-        with open(args.spec + ".new", "w") as ofh:
+        ok = False
+        newfn = _out(args.spec)
+        if not args.outdir:
+            newfn += '.new'
+        with open(newfn, "w") as ofh:
             with open(args.spec, "r") as ifh:
                 for line in ifh:
                     if line.startswith('# NODE_MODULES BEGIN'):
@@ -154,13 +161,17 @@ def main(args):
                         for line in ifh:
                             if line.startswith('# NODE_MODULES END'):
                                 write_rpm_sources(ofh, args)
+                                ok = True
                                 break
 
                     ofh.write(line)
-        os.rename(args.spec+".new", args.spec)
+        if not ok:
+            raise Exception("# NODE_MODULES [BEGIN|END] not found")
+        if not args.outdir:
+            os.rename(args.spec+".new", args.spec)
 
     if args.locations:
-        with open(args.locations, "w") as fh:
+        with open(_out(args.locations), "w") as fh:
             for fn in sorted(MODULE_MAP):
                 fh.write("{} {}\n".format(fn, " ".join(sorted(MODULE_MAP[fn]["path"]))))
 
@@ -185,26 +196,28 @@ def main(args):
                     [
                         "git",
                         "archive",
-                        "--format=tar.gz",
+                        "--format=tar." + (OBS_SCM_COMPRESSION if OBS_SCM_COMPRESSION else 'gz'),
                         "-o",
-                        "../" + fn,
+                        _out(fn),
                         "--prefix",
                         "package/",
                         MODULE_MAP[fn]["branch"],
                     ],
                     cwd=d,
                 )
+                if not args.outdir:
+                    os.rename(os.path.join(d, fn), fn)
                 if r.returncode:
                     logging.error("failed to create tar %s", url)
                     continue
             else:
                 req = urllib.request.Request(url)
-                if os.path.exists(fn):
+                if os.path.exists(_out(fn)):
                     if args.download_skip_existing:
                         logging.info("skipping download of existing %s", fn)
                         continue
                     stamp = time.strftime(
-                        "%a, %d %b %Y %H:%M:%S GMT", time.gmtime(os.path.getmtime(fn))
+                        "%a, %d %b %Y %H:%M:%S GMT", time.gmtime(os.path.getmtime(_out(fn)))
                     )
                     logging.debug("adding If-Modified-Since %s: %s", fn, stamp)
                     req.add_header("If-Modified-Since", stamp)
@@ -227,20 +240,20 @@ def main(args):
                         )
                     else:
                         try:
-                            with open(fn + ".new", "wb") as fh:
+                            with open(_out(fn) + ".new", "wb") as fh:
                                 fh.write(data)
                         except OSError as e:
                             logging.error(e)
                         finally:
-                            os.rename(fn + ".new", fn)
+                            os.rename(_out(fn) + ".new", _out(fn))
                 except urllib.error.HTTPError as e:
                     logging.error(e)
 
     if args.checksums:
-        with open(args.checksums, "w") as fh:
+        with open(_out(args.checksums), "w") as fh:
             for fn in sorted(MODULE_MAP):
                 if 'algo' not in MODULE_MAP[fn]:
-                    update_checksum(fn)
+                    update_checksum(_out(fn))
                 fh.write(
                     "{} ({}) = {}\n".format(
                         MODULE_MAP[fn]["algo"].upper(), fn, MODULE_MAP[fn]["chksum"]
@@ -326,6 +339,12 @@ if __name__ == "__main__":
         "--obs-service", metavar="FILE", help="OBS service file for download_url"
     )
     parser.add_argument(
+        "--outdir", metavar="DIR", help="where to put files"
+    )
+    parser.add_argument(
+        "--compression", metavar="EXT", help="use EXT compression"
+    )
+    parser.add_argument(
         "--obs-service-scm-only",
         action="store_true",
         help="only generate tar_scm entries in service file",
@@ -349,11 +368,10 @@ if __name__ == "__main__":
 
     logging.basicConfig(format='%(levelname)s:%(message)s', level=level)
 
-    if args.obs_service or args.spec:
+    if args.compression:
+        OBS_SCM_COMPRESSION = args.compression
+    elif args.obs_service:
         OBS_SCM_COMPRESSION = 'xz'
-        if args.download:
-            logging.error("can't have download and service/spec at the same time")
-            sys.exit(1)
 
     sys.exit(main(args))
 
