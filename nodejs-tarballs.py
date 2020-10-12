@@ -121,12 +121,14 @@ def collect_deps_recursive(d, deps):
         if "dependencies" in entry:
             collect_deps_recursive(path, entry["dependencies"])
 
+
 def write_rpm_sources(fh, args):
     i = args.source_offset if args.source_offset is not None else ''
     for fn in sorted(MODULE_MAP):
         fh.write("Source{}:         {}#/{}\n".format(i, MODULE_MAP[fn]["url"], fn))
         if args.source_offset is not None:
             i += 1
+
 
 def main(args):
     logging.info("main")
@@ -309,15 +311,15 @@ def main(args):
                 continue
             url = MODULE_MAP[fn]["url"]
             if "scm" in MODULE_MAP[fn]:
-                s = ET.SubElement(root, 'service', { 'name': 'obs_scm'})
-                ET.SubElement(s, 'param', { 'name': 'scm'}).text = "git"
-                ET.SubElement(s, 'param', { 'name': 'url'}).text = MODULE_MAP[fn]["url"]
-                ET.SubElement(s, 'param', { 'name': 'revision'}).text = MODULE_MAP[fn]["branch"]
-                ET.SubElement(s, 'param', { 'name': 'version'}).text = MODULE_MAP[fn]["branch"]
+                s = ET.SubElement(root, 'service', {'name': 'obs_scm'})
+                ET.SubElement(s, 'param', {'name': 'scm'}).text = "git"
+                ET.SubElement(s, 'param', {'name': 'url'}).text = MODULE_MAP[fn]["url"]
+                ET.SubElement(s, 'param', {'name': 'revision'}).text = MODULE_MAP[fn]["branch"]
+                ET.SubElement(s, 'param', {'name': 'version'}).text = MODULE_MAP[fn]["branch"]
             elif not args.obs_service_scm_only:
-                s = ET.SubElement(root, 'service', { 'name': 'download_url'})
-                ET.SubElement(s, 'param', { 'name': 'url'}).text = MODULE_MAP[fn]["url"]
-                ET.SubElement(s, 'param', { 'name': 'prefer-old'}).text = 'enable'
+                s = ET.SubElement(root, 'service', {'name': 'download_url'})
+                ET.SubElement(s, 'param', {'name': 'url'}).text = MODULE_MAP[fn]["url"]
+                ET.SubElement(s, 'param', {'name': 'prefer-old'}).text = 'enable'
 
         tree.write(args.obs_service, pretty_print=True)
 
