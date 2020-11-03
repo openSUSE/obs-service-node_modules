@@ -18,6 +18,50 @@ What all methods have in common is that in the end shell code in
 `npm build` in `%build`. The tool produces a file `node_modules.loc`
 to aid that shell code.
 
+## As OBS service
+
+- Make sure to put the `package-lock.json` next to the spec file.
+- Add the following lines to the spec file:
+   ```
+   # NODE_MODULES BEDIN
+   XXX will be filled by script
+   # NODE_MODULES END
+   ```
+- Create file `_service` with the following content:
+  ```
+  <services>
+    <service name="node_modules"/>
+  </services>
+  ```
+- `osc ci`
+
+### Example
+
+  ```
+  [...]
+  Source:       package-lock.json
+  Source:       node_modules.loc
+  # NODE_MODULES BEDIN
+  # processed by node_modules service
+  # NODE_MODULES END
+  BuildRequires:  nodejs-devel-default
+  BuildRequires:  nodejs-rpm-macros
+
+  [...]
+
+  %prep
+  %setup
+  cp %{_sourcedir}/package-lock.json .
+  %prepare_node_modules %{_sourcedir}/node_modules.loc
+
+  [...]
+
+  %build
+  npm rebuild
+  ```
+
+## Manually calling the tool
+
 There are two ways how to list the sources in a spec file
 
 1. write spec file snippet for use with `%include` in some main spec
@@ -79,8 +123,7 @@ There are also several ways how the sources can be downloaded.
 In addition the script can produce a checksums file as used by Fedora for
 verification (`--checksums=FILE`)
 
-Example
--------
+### Example
 
 - Build the software locally so npm generates package-lock.json. It's possible
   to prepare the package and run `osc build`. When it failed, reuse the chroot
@@ -89,37 +132,37 @@ Example
 - run
 
   ```
-  nodejs-tarballs.py --locations node_modules.loc --spec cockpit-node_modules.spec --obs-service=_service --obs-service-scm-only --source-offset=1000
+  node_modules.py --locations node_modules.loc --spec cockpit-node_modules.spec --obs-service=_service --obs-service-scm-only --source-offset=1000
   ```
 
 - Modify the spec file
 
   ```
+  [...]
   Source:       package-lock.json
   Source:       node_modules.loc
   # NODE_MODULES BEDIN
-  [...]
+  # processed by node_modules service
   # NODE_MODULES END
   BuildRequires:  nodejs-devel-default
   BuildRequires:  nodejs-rpm-macros
-  ```
 
-  then later in the %prep section after %setup
+  [...]
 
-  ```
+  %prep
+  %setup
   cp %{_sourcedir}/package-lock.json .
   %prepare_node_modules %{_sourcedir}/node_modules.loc
-  ```
 
-  finally in %build
+  [...]
 
-  ```
+  %build
   npm rebuild
   ```
+
 
 - update the `_service` file to include `download_files` resp services needed
   for handling git files if needed.
 
-In Practice
------------
+### In Practice
 https://build.opensuse.org/project/show/home:lnussel:branches:systemsmanagement:cockpit:rebuild
