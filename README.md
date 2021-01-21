@@ -20,6 +20,8 @@ to aid that shell code.
 
 ## As OBS service
 
+This method runs the download of NPM modules on server side
+
 - Make sure to put the `package-lock.json` next to the spec file.
 - Add the following lines to the spec file:
    ```
@@ -59,6 +61,58 @@ to aid that shell code.
   %build
   npm rebuild
   ```
+
+## As disabled OBS service
+
+With this method the packager has to call the service locally to
+download all NPM modules and bundle them in a cpio archive. The
+resulting source rpm has individual sources nevertheless.
+
+A file with `.obscpio` suffix is treated special by OBS and unpacked
+automatically by the build script. RPM source lines will be written
+to a separate file included at build by rpmbuild (an offset is only
+needed for older rpm versions that don't support auto numbering).
+
+- Make sure to put the `package-lock.json` next to the spec file.
+- Add the following lines to the spec file:
+   ```
+   %include node_modules.spec.in
+   ```
+- Create file `_service` with the following content:
+  ```
+  <services>
+    <service name="node_modules" mode="disabled">
+      <param name="cpio">node_modules.obscpio</param>
+      <param name="output">node_modules.spec.inc</param>
+      <param name="source-offset">10000</param>
+    </service>
+  </services>
+  ```
+- `osc ci`
+
+### Example
+
+  ```
+  [...]
+  Source:       package-lock.json
+  Source:       node_modules.loc
+  %include      node_modules.spec.in
+  BuildRequires:  nodejs-devel-default
+  BuildRequires:  nodejs-rpm-macros
+
+  [...]
+
+  %prep
+  %setup
+  cp %{_sourcedir}/package-lock.json .
+  %prepare_node_modules %{_sourcedir}/node_modules.loc
+
+  [...]
+
+  %build
+  npm rebuild
+  ```
+
 
 ## Manually calling the tool
 
