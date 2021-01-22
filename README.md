@@ -25,7 +25,7 @@ This method runs the download of NPM modules on server side
 - Make sure to put the `package-lock.json` next to the spec file.
 - Add the following lines to the spec file:
    ```
-   # NODE_MODULES BEDIN
+   # NODE_MODULES BEGIN
    XXX will be filled by script
    # NODE_MODULES END
    ```
@@ -43,7 +43,7 @@ This method runs the download of NPM modules on server side
   [...]
   Source:       package-lock.json
   Source:       node_modules.loc
-  # NODE_MODULES BEDIN
+  # NODE_MODULES BEGIN
   # processed by node_modules service
   # NODE_MODULES END
   BuildRequires:  nodejs-devel-default
@@ -131,7 +131,7 @@ There are two ways how to list the sources in a spec file
 
 2. write directly into the spec file (`--spec foo.spec`)
    ```
-   # NODE_MODULES BEDIN
+   # NODE_MODULES BEGIN
    XXX will be filled by script
    # NODE_MODULES END
    ```
@@ -195,7 +195,7 @@ verification (`--checksums=FILE`)
   [...]
   Source:       package-lock.json
   Source:       node_modules.loc
-  # NODE_MODULES BEDIN
+  # NODE_MODULES BEGIN
   # processed by node_modules service
   # NODE_MODULES END
   BuildRequires:  nodejs-devel-default
