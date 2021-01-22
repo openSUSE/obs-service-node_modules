@@ -76,7 +76,8 @@ needed for older rpm versions that don't support auto numbering).
 - Make sure to put the `package-lock.json` next to the spec file.
 - Add the following lines to the spec file:
    ```
-   %include node_modules.spec.in
+   Source99:  node_modules.spec.in
+   %include   %{_sourcedir}/%{SOURCE99}
    ```
 - Create file `_service` with the following content:
   ```
@@ -94,9 +95,10 @@ needed for older rpm versions that don't support auto numbering).
 
   ```
   [...]
-  Source:       package-lock.json
-  Source:       node_modules.loc
-  %include      node_modules.spec.in
+  Source97:     package-lock.json
+  Source98:     node_modules.loc
+  Source99:     node_modules.spec.in
+  %include      %{_sourcedir}/%{SOURCE99}
   BuildRequires:  nodejs-devel-default
   BuildRequires:  nodejs-rpm-macros
 
@@ -121,8 +123,8 @@ There are two ways how to list the sources in a spec file
 1. write spec file snippet for use with `%include` in some main spec
    file (`--output node_modules.inc`).
    ```
-   Source99:       node_modules.inc
-   %include %{SOURCE99}
+   Source99: node_modules.spec.inc
+   %include  %{_sourcedir}/%{SOURCE99}
    ```
 
    This has the advantage to separate the automatically generated
