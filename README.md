@@ -50,7 +50,9 @@ externally download sources for use by `npm` during `rpmbuild`.
 ### Example
 
   ```
-  Source:         package-lock.json
+  Source10:       package-lock.json
+  Source11:       node_modules.spec.inc
+  %include        %{_sourcedir}/node_modules.spec.inc
   BuildRequires:  local-npm-registry
 
   [...]
