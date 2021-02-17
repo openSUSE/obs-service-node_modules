@@ -67,3 +67,6 @@ externally download sources for use by `npm` during `rpmbuild`.
 
 ### In Practice
 https://build.opensuse.org/package/show/openSUSE:Factory/cockpit-podman
+
+### External Resources
+https://github.com/openSUSE/npm-localhost-proxy
