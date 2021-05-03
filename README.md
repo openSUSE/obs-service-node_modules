@@ -23,7 +23,10 @@ externally download sources for use by `npm` during `rpmbuild`.
 ## As OBS service
 
 - Get `package-lock.json` with `localfileVersion: 2`. For example,
-  - `npm install --package-lock-only` with npm 7+
+  - `npm install --package-lock-only --legacy-peer-deps` with npm 7+
+  - --legacy-peer-deps is required to fetch peer dependencies from remote
+    locally so they are available during peer resolution in the VM. Without
+    this you may get additional warnings during install.
 - Make sure to put the `package-lock.json` next to the spec file and
   remove it from the sources. Sources should only have `package.json`,
   even if they ship a compatible `package-lock.json`
