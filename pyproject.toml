@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "obs-service-node_modules"
+version = "1.0"
+description = "Build RPM packages using node modules offline"
+authors = ["Ludwig Nussel <ludwig.nussel@suse.de>", "Adam Majer <amajer@suse.de>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = ">=3.6.2,<4.0"
+urllib3 = ">= 1.25.10"
+lxml = ">= 4.0.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2.4"
+pytest-testinfra = "^6.4.0"
+lxml-stubs = "^0.2.0"
+mypy = "^0.910"
+pytest-xdist = "^2.3.0"
+pytest_container = { git = "https://github.com/dcermak/pytest_container.git", branch = "main" }
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
