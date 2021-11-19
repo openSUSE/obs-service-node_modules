@@ -44,7 +44,7 @@ externally download sources for use by `npm` during `rpmbuild`.
     </service>
   </services>
   ```
-- `osc service localrun`
+- `osc service manualrun`
   - this generates the NPM dependency archive along with its source URLs
 - `osc add node_modules.obscpio`
 - `osc add node_modules.spec.inc`
