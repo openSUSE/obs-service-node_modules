@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "obs-service-node_modules"
 version = "1.0"
-description = "Build RPM packages using node modules offline"
+description = "Downloads npm packages for offline installation"
 authors = ["Ludwig Nussel <ludwig.nussel@suse.de>", "Adam Majer <amajer@suse.de>"]
 license = "MIT"
 
