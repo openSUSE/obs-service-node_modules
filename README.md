@@ -22,7 +22,7 @@ externally download sources for use by `npm` during `rpmbuild`.
 
 ## As OBS service
 
-- Get `package-lock.json` with `localfileVersion: 2`. For example,
+- Get `package-lock.json` with `lockfileVersion: 2` (or higher). For example,
   - `npm install --package-lock-only --legacy-peer-deps --ignore-scripts`
     with npm 7+
   - `--legacy-peer-deps` is required to fetch peer dependencies from remote
@@ -36,18 +36,17 @@ externally download sources for use by `npm` during `rpmbuild`.
    %include  %{_sourcedir}/node_modules.spec.inc
    ```
 - Create file `_service` with the following content:
-  ```
+  ```xml
   <services>
     <service name="node_modules" mode="manual">
-      <param name="cpio">node_modules.obscpio</param>
       <param name="output">node_modules.spec.inc</param>
       <param name="source-offset">10000</param>
     </service>
   </services>
   ```
 - `osc service manualrun`
-  - this generates the NPM dependency archive along with its source URLs
-- `osc add node_modules.obscpio`
+  - this downloads the individual dependency tarballs into the `node_modules` directory and generates `node_modules.spec.inc`
+- `osc add node_modules`
 - `osc add node_modules.spec.inc`
 - `osc commit`
 
@@ -70,6 +69,27 @@ externally download sources for use by `npm` during `rpmbuild`.
   %build
   npm run build
   ```
+
+## Legacy Container Mode
+
+If you need to package the downloaded NPM modules into a single archive (e.g., for backward compatibility or integration with older build workflows), you can use the legacy container mode by enabling the `legacy-container` parameter.
+
+- Create file `_service` with the following content:
+  ```xml
+  <services>
+    <service name="node_modules" mode="manual">
+      <param name="legacy-container">true</param>
+      <param name="cpio">node_modules.obscpio</param>
+      <param name="output">node_modules.spec.inc</param>
+      <param name="source-offset">10000</param>
+    </service>
+  </services>
+  ```
+- `osc service manualrun`
+  - this packages all downloaded modules into a single `node_modules.obscpio` cpio archive.
+- `osc add node_modules.obscpio` instead of `osc add node_modules`
+- `osc add node_modules.spec.inc`
+- `osc commit`
 
 ### Service Parameters
 
