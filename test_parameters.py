@@ -4,26 +4,41 @@ import os
 import shutil
 import pytest
 
-NODE_MODULES_PY = os.path.abspath(os.path.join(os.path.dirname(__file__), "node_modules.py"))
+NODE_MODULES_PY = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "node_modules.py")
+)
+
 
 def test_cpio_without_legacy_container():
     """Verify that using --cpio without --legacy-container raises a command line validation error."""
     result = subprocess.run(
         [sys.executable, NODE_MODULES_PY, "--cpio", "test.obscpio"],
         capture_output=True,
-        text=True
+        text=True,
     )
     assert result.returncode != 0
     assert "--cpio can only be used when --legacy-container is enabled" in result.stderr
 
+
 def test_legacy_container_and_cpio_accepted():
     """Verify that both --legacy-container and --cpio are accepted together (should not raise parser error)."""
     result = subprocess.run(
-        [sys.executable, NODE_MODULES_PY, "--legacy-container", "--cpio", "test.obscpio", "--dry"],
+        [
+            sys.executable,
+            NODE_MODULES_PY,
+            "--legacy-container",
+            "--cpio",
+            "test.obscpio",
+            "--dry",
+        ],
         capture_output=True,
-        text=True
+        text=True,
     )
-    assert "--cpio can only be used when --legacy-container is enabled" not in result.stderr
+    assert (
+        "--cpio can only be used when --legacy-container is enabled"
+        not in result.stderr
+    )
+
 
 def test_node_dir_routing(tmp_path):
     """Verify that individual tarballs are routed into the specified node-dir when legacy-container is false."""
@@ -44,7 +59,7 @@ def test_node_dir_routing(tmp_path):
 }""")
 
     custom_node_dir = "custom_deps_folder"
-    
+
     spec_file = parent_dir / "mock.spec"
     spec_file.write_text("# NODE_MODULES BEGIN\n# NODE_MODULES END\n")
 
@@ -52,21 +67,26 @@ def test_node_dir_routing(tmp_path):
         [
             sys.executable,
             NODE_MODULES_PY,
-            "-i", "package-lock.json",
-            "--spec", "mock.spec",
-            "--node-dir", custom_node_dir,
-            "--outdir", str(tmp_path),
-            "--download"
+            "-i",
+            "package-lock.json",
+            "--spec",
+            "mock.spec",
+            "--node-dir",
+            custom_node_dir,
+            "--outdir",
+            str(tmp_path),
+            "--download",
         ],
         capture_output=True,
         text=True,
-        cwd=parent_dir
+        cwd=parent_dir,
     )
-    
+
     assert result.returncode == 0
     target_dir = tmp_path / custom_node_dir
     assert target_dir.is_dir()
     assert (target_dir / "ms-2.0.0.tgz").is_file()
+
 
 def test_unneeded_files_cleanup(tmp_path):
     """Verify that unneeded files are removed from the node-dir when --cpio is not used."""
@@ -95,15 +115,19 @@ def test_unneeded_files_cleanup(tmp_path):
         [
             sys.executable,
             NODE_MODULES_PY,
-            "-i", "package-lock.json",
-            "--spec", "mock.spec",
-            "--node-dir", custom_node_dir,
-            "--outdir", str(tmp_path),
-            "--download"
+            "-i",
+            "package-lock.json",
+            "--spec",
+            "mock.spec",
+            "--node-dir",
+            custom_node_dir,
+            "--outdir",
+            str(tmp_path),
+            "--download",
         ],
         capture_output=True,
         text=True,
-        cwd=parent_dir
+        cwd=parent_dir,
     )
     assert result.returncode == 0
     target_dir = tmp_path / custom_node_dir
@@ -121,19 +145,24 @@ def test_unneeded_files_cleanup(tmp_path):
         [
             sys.executable,
             NODE_MODULES_PY,
-            "-i", "package-lock.json",
-            "--spec", "mock.spec",
-            "--node-dir", custom_node_dir,
-            "--outdir", str(tmp_path),
-            "--download"
+            "-i",
+            "package-lock.json",
+            "--spec",
+            "mock.spec",
+            "--node-dir",
+            custom_node_dir,
+            "--outdir",
+            str(tmp_path),
+            "--download",
         ],
         capture_output=True,
         text=True,
-        cwd=parent_dir
+        cwd=parent_dir,
     )
     assert result.returncode == 0
     assert needed_file.is_file()
     assert not unneeded_file.exists()
+
 
 def test_unneeded_files_cleanup_safety_guard(tmp_path):
     """Verify that unneeded files are NOT removed if the download directory is the current directory (safety guard)."""
@@ -160,14 +189,16 @@ def test_unneeded_files_cleanup_safety_guard(tmp_path):
         [
             sys.executable,
             NODE_MODULES_PY,
-            "-i", "package-lock.json",
-            "--spec", "mock.spec",
+            "-i",
+            "package-lock.json",
+            "--spec",
+            "mock.spec",
             "--legacy-container",
-            "--download"
+            "--download",
         ],
         capture_output=True,
         text=True,
-        cwd=tmp_path
+        cwd=tmp_path,
     )
     assert result.returncode == 0
     needed_file = tmp_path / "ms-2.0.0.tgz"
@@ -183,14 +214,16 @@ def test_unneeded_files_cleanup_safety_guard(tmp_path):
         [
             sys.executable,
             NODE_MODULES_PY,
-            "-i", "package-lock.json",
-            "--spec", "mock.spec",
+            "-i",
+            "package-lock.json",
+            "--spec",
+            "mock.spec",
             "--legacy-container",
-            "--download"
+            "--download",
         ],
         capture_output=True,
         text=True,
-        cwd=tmp_path
+        cwd=tmp_path,
     )
     assert result.returncode == 0
     assert needed_file.is_file()
@@ -201,7 +234,7 @@ def test_osc_directory_rename_consecutive_runs(tmp_path):
     """Simulate osc's consecutive runs where a temp dir's node_modules is moved/renamed to the package dir."""
     package_dir = tmp_path / "package"
     package_dir.mkdir()
-    
+
     lock_file = package_dir / "package-lock.json"
     lock_file.write_text("""{
   "name": "simple-test",
@@ -223,23 +256,27 @@ def test_osc_directory_rename_consecutive_runs(tmp_path):
     # RUN 1:
     temp_dir_1 = package_dir / "temp_dir_1"
     temp_dir_1.mkdir()
-    
+
     result = subprocess.run(
         [
             sys.executable,
             NODE_MODULES_PY,
-            "-i", "package-lock.json",
-            "--spec", "mock.spec",
-            "--node-dir", "node_modules",
-            "--outdir", str(temp_dir_1),
-            "--download"
+            "-i",
+            "package-lock.json",
+            "--spec",
+            "mock.spec",
+            "--node-dir",
+            "node_modules",
+            "--outdir",
+            str(temp_dir_1),
+            "--download",
         ],
         capture_output=True,
         text=True,
-        cwd=package_dir
+        cwd=package_dir,
     )
     assert result.returncode == 0
-    
+
     # Simulate osc moving temp_dir_1/node_modules to package_dir/node_modules
     os.rename(temp_dir_1 / "node_modules", package_dir / "node_modules")
     assert (package_dir / "node_modules" / "ms-2.0.0.tgz").is_file()
@@ -247,23 +284,27 @@ def test_osc_directory_rename_consecutive_runs(tmp_path):
     # RUN 2:
     temp_dir_2 = package_dir / "temp_dir_2"
     temp_dir_2.mkdir()
-    
+
     result = subprocess.run(
         [
             sys.executable,
             NODE_MODULES_PY,
-            "-i", "package-lock.json",
-            "--spec", "mock.spec",
-            "--node-dir", "node_modules",
-            "--outdir", str(temp_dir_2),
-            "--download"
+            "-i",
+            "package-lock.json",
+            "--spec",
+            "mock.spec",
+            "--node-dir",
+            "node_modules",
+            "--outdir",
+            str(temp_dir_2),
+            "--download",
         ],
         capture_output=True,
         text=True,
-        cwd=package_dir
+        cwd=package_dir,
     )
     assert result.returncode == 0
-    
+
     # Simulate osc moving temp_dir_2/node_modules to package_dir/node_modules
     # On unpatched code, this will raise OSError because package_dir/node_modules exists and is not empty.
     os.rename(temp_dir_2 / "node_modules", package_dir / "node_modules")
@@ -297,15 +338,19 @@ def test_existing_file_checksum_verification(tmp_path):
         [
             sys.executable,
             NODE_MODULES_PY,
-            "-i", "package-lock.json",
-            "--spec", "mock.spec",
-            "--node-dir", custom_node_dir,
-            "--outdir", str(tmp_path),
-            "--download"
+            "-i",
+            "package-lock.json",
+            "--spec",
+            "mock.spec",
+            "--node-dir",
+            custom_node_dir,
+            "--outdir",
+            str(tmp_path),
+            "--download",
         ],
         capture_output=True,
         text=True,
-        cwd=parent_dir
+        cwd=parent_dir,
     )
     assert result.returncode == 0
     target_file = tmp_path / custom_node_dir / "ms-2.0.0.tgz"
@@ -321,16 +366,20 @@ def test_existing_file_checksum_verification(tmp_path):
         [
             sys.executable,
             NODE_MODULES_PY,
-            "-i", "package-lock.json",
-            "--spec", "mock.spec",
-            "--node-dir", custom_node_dir,
-            "--outdir", str(tmp_path),
+            "-i",
+            "package-lock.json",
+            "--spec",
+            "mock.spec",
+            "--node-dir",
+            custom_node_dir,
+            "--outdir",
+            str(tmp_path),
             "--download",
-            "--verbose"
+            "--verbose",
         ],
         capture_output=True,
         text=True,
-        cwd=parent_dir
+        cwd=parent_dir,
     )
     assert result.returncode == 0
     assert target_file.stat().st_size == original_size
@@ -340,7 +389,7 @@ def test_existing_file_checksum_verification(tmp_path):
 def test_obscpio_checksum_verification(tmp_path):
     """Verify that a corrupted file inside a .obscpio legacy container is detected and re-downloaded."""
     import sys
-    
+
     lock_file = tmp_path / "package-lock.json"
     lock_file.write_text("""{
   "name": "simple-test",
@@ -362,7 +411,7 @@ def test_obscpio_checksum_verification(tmp_path):
     # Write a corrupt node_modules.obscpio using CpioWriter imported from node_modules.py
     sys.path.insert(0, os.path.dirname(NODE_MODULES_PY))
     from node_modules import CpioWriter, CpioReader
-    
+
     cpio_path = tmp_path / "node_modules.obscpio"
     with CpioWriter(str(cpio_path)) as c:
         c.add("ms-2.0.0.tgz", b"corrupted cpio content")
@@ -370,37 +419,40 @@ def test_obscpio_checksum_verification(tmp_path):
     # Run the service with legacy-container and cpio options
     out_dir = tmp_path / "out"
     out_dir.mkdir()
-    
+
     result = subprocess.run(
         [
             sys.executable,
             NODE_MODULES_PY,
-            "-i", "package-lock.json",
-            "--spec", "mock.spec",
+            "-i",
+            "package-lock.json",
+            "--spec",
+            "mock.spec",
             "--legacy-container",
-            "--cpio", "node_modules.obscpio",
-            "--outdir", str(out_dir),
+            "--cpio",
+            "node_modules.obscpio",
+            "--outdir",
+            str(out_dir),
             "--download",
-            "--verbose"
+            "--verbose",
         ],
         capture_output=True,
         text=True,
-        cwd=tmp_path
+        cwd=tmp_path,
     )
-    
+
     assert result.returncode == 0
     assert "checksum failure for existing ms-2.0.0.tgz, re-downloading" in result.stderr
-    
+
     # Verify that the final cpio file exists in out_dir and contains the correctly downloaded file (not corrupted)
     final_cpio = out_dir / "node_modules.obscpio"
     assert final_cpio.is_file()
-    
+
     # Extract final cpio and check file contents size (it should be original correct size, not corrupted size)
     ext_dir = tmp_path / "extracted"
     ext_dir.mkdir()
     CpioReader(str(final_cpio)).extract(str(ext_dir))
-    
+
     extracted_file = ext_dir / "ms-2.0.0.tgz"
     assert extracted_file.is_file()
     assert extracted_file.stat().st_size > 2000  # ms-2.0.0.tgz size is ~2.3kb
-
