@@ -11,11 +11,11 @@ urllib3 = ">= 1.25.10"
 lxml = ">= 4.0.0"
 
 [tool.poetry.dev-dependencies]
-pytest = "^6.2.4"
-pytest-testinfra = "^6.4.0"
+pytest = ">=6.2.4"
+pytest-testinfra = ">=6.4.0"
 lxml-stubs = "^0.2.0"
-mypy = "^0.910"
-pytest-xdist = "^2.3.0"
+mypy = ">=0.910"
+pytest-xdist = ">=2.3.0"
 pytest_container = { git = "https://github.com/dcermak/pytest_container.git", branch = "main" }
 
 [build-system]
