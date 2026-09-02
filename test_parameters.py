@@ -17,7 +17,7 @@ def test_cpio_without_legacy_container():
         text=True,
     )
     assert result.returncode != 0
-    assert "--cpio can only be used when --legacy-container is enabled" in result.stderr
+    assert "--cpio is not recommended for Git Workflow projects" in result.stderr
 
 
 def test_legacy_container_and_cpio_accepted():
