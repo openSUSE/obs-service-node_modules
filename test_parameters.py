@@ -456,3 +456,82 @@ def test_obscpio_checksum_verification(tmp_path):
     extracted_file = ext_dir / "ms-2.0.0.tgz"
     assert extracted_file.is_file()
     assert extracted_file.stat().st_size > 2000  # ms-2.0.0.tgz size is ~2.3kb
+
+
+def test_include_file_sources_with_and_without_legacy_container(tmp_path):
+    """Verify that the include file (or spec file) correctly takes care of the subfolder when not using obscpio."""
+    parent_dir = tmp_path / "parent"
+    parent_dir.mkdir()
+    lock_file = parent_dir / "package-lock.json"
+    lock_file.write_text("""{
+  "name": "simple-test",
+  "version": "1.0.0",
+  "lockfileVersion": 2,
+  "requires": true,
+  "dependencies": {
+    "ms": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz",
+      "integrity": "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A=="
+    }
+  }
+}""")
+
+    # Case 1: Without legacy container (i.e. not using obscpio, git workflow)
+    # The Source URL must prepend the node-dir subfolder
+    out_dir_git = tmp_path / "out_git"
+    out_dir_git.mkdir()
+    spec_file_git = parent_dir / "mock_git.spec"
+    spec_file_git.write_text("# NODE_MODULES BEGIN\n# NODE_MODULES END\n")
+
+    result_git = subprocess.run(
+        [
+            sys.executable,
+            NODE_MODULES_PY,
+            "-i",
+            "package-lock.json",
+            "--spec",
+            "mock_git.spec",
+            "--node-dir",
+            "my_custom_dir",
+            "--outdir",
+            str(out_dir_git),
+        ],
+        capture_output=True,
+        text=True,
+        cwd=parent_dir,
+    )
+    assert result_git.returncode == 0
+    spec_content_git = (out_dir_git / "mock_git.spec").read_text()
+    assert "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz#/my_custom_dir/ms-2.0.0.tgz" in spec_content_git
+
+    # Case 2: With legacy container (i.e. using obscpio)
+    # The Source URL must NOT prepend the node-dir subfolder
+    out_dir_legacy = tmp_path / "out_legacy"
+    out_dir_legacy.mkdir()
+    spec_file_legacy = parent_dir / "mock_legacy.spec"
+    spec_file_legacy.write_text("# NODE_MODULES BEGIN\n# NODE_MODULES END\n")
+
+    result_legacy = subprocess.run(
+        [
+            sys.executable,
+            NODE_MODULES_PY,
+            "-i",
+            "package-lock.json",
+            "--spec",
+            "mock_legacy.spec",
+            "--legacy-container",
+            "--cpio",
+            "node_modules.obscpio",
+            "--node-dir",
+            "my_custom_dir",
+            "--outdir",
+            str(out_dir_legacy),
+        ],
+        capture_output=True,
+        text=True,
+        cwd=parent_dir,
+    )
+    assert result_legacy.returncode == 0
+    spec_content_legacy = (out_dir_legacy / "mock_legacy.spec").read_text()
+    assert "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz#/ms-2.0.0.tgz" in spec_content_legacy
