@@ -71,6 +71,15 @@ externally download sources for use by `npm` during `rpmbuild`.
   npm run build
   ```
 
+### Service Parameters
+
+- `input` (optional): The input package-lock.json file to parse. Defaults to `package-lock.json`.
+- `output` (optional): The file to write RPM source lines into.
+- `source-offset` (optional): The RPM source number to start with.
+- `legacy-container` (optional): If set to `true`, packages the downloaded files into a `.obscpio` archive (specified by `cpio`). If set to `false` (default), downloads files into a directory specified by `node-dir`.
+- `node-dir` (optional): The directory name to store individual tarballs in when `legacy-container` is `false`. Defaults to `node_modules`.
+- `cpio` (optional, legacy): The cpio archive filename to store all tarballs in. This parameter can only be used if `legacy-container` is set to `true`.
+
 ### In Practice
 https://build.opensuse.org/package/show/openSUSE:Factory/cockpit-podman
 
