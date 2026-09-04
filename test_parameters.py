@@ -114,6 +114,79 @@ def test_legacy_container_parameter_values():
     assert "Boolean value expected, got invalid_val" in result.stderr
 
 
+def test_output_file_gated_by_legacy_container(tmp_path):
+    """Verify that the --output file (e.g. node_modules.spec.inc) is only generated when --legacy-container is enabled."""
+    parent_dir = tmp_path.parent
+    lock_file = parent_dir / "package-lock.json"
+    lock_file.write_text("""{
+  "name": "simple-test",
+  "version": "1.0.0",
+  "lockfileVersion": 2,
+  "requires": true,
+  "dependencies": {
+    "ms": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz",
+      "integrity": "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A=="
+    }
+  }
+}""")
+
+    spec_file = parent_dir / "mock.spec"
+    spec_file.write_text("# NODE_MODULES BEGIN\n# NODE_MODULES END\n")
+
+    output_inc_file = tmp_path / "node_modules.spec.inc"
+
+    # 1. Run WITHOUT --legacy-container but with --output
+    # Note: --output should NOT be written
+    result = subprocess.run(
+        [
+            sys.executable,
+            NODE_MODULES_PY,
+            "-i",
+            "package-lock.json",
+            "--spec",
+            "mock.spec",
+            "--output",
+            "node_modules.spec.inc",
+            "--node-dir",
+            "node_modules",
+            "--outdir",
+            str(tmp_path),
+            "--download",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=parent_dir,
+    )
+    assert result.returncode == 0
+    assert not output_inc_file.exists()
+
+    # 2. Run WITH --legacy-container and --output
+    # Note: --output should be written
+    result = subprocess.run(
+        [
+            sys.executable,
+            NODE_MODULES_PY,
+            "-i",
+            "package-lock.json",
+            "--spec",
+            "mock.spec",
+            "--output",
+            "node_modules.spec.inc",
+            "--legacy-container",
+            "--outdir",
+            str(tmp_path),
+            "--download",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=parent_dir,
+    )
+    assert result.returncode == 0
+    assert output_inc_file.is_file()
+
+
 def test_node_dir_routing(tmp_path):
     """Verify that individual tarballs are routed into the specified node-dir when legacy-container is false."""
     parent_dir = tmp_path.parent
@@ -576,8 +649,8 @@ def test_include_file_sources_with_and_without_legacy_container(tmp_path):
         cwd=parent_dir,
     )
     assert result_git.returncode == 0
-    spec_content_git = (out_dir_git / "mock_git.spec").read_text()
-    assert "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz#/my_custom_dir/ms-2.0.0.tgz" in spec_content_git
+    # Since legacy-container is disabled, mock_git.spec is NOT processed or written to outdir
+    assert not (out_dir_git / "mock_git.spec").exists()
 
     # Case 2: With legacy container (i.e. using obscpio)
     # The Source URL must NOT prepend the node-dir subfolder
