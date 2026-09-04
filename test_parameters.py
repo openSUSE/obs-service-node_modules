@@ -40,6 +40,80 @@ def test_legacy_container_and_cpio_accepted():
     )
 
 
+def test_legacy_container_parameter_values():
+    """Verify that --legacy-container accepts truthy, falsy, and empty string values correctly."""
+    # 1. Test truthy value '1'
+    result = subprocess.run(
+        [
+            sys.executable,
+            NODE_MODULES_PY,
+            "--legacy-container", "1",
+            "--cpio", "test.obscpio",
+            "--dry",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert "--cpio is not recommended" not in result.stderr
+
+    # 2. Test empty string '' (which is passed by OBS for valueless parameter elements)
+    result = subprocess.run(
+        [
+            sys.executable,
+            NODE_MODULES_PY,
+            "--legacy-container", "",
+            "--cpio", "test.obscpio",
+            "--dry",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert "--cpio is not recommended" not in result.stderr
+
+    # 3. Test falsy value '0'
+    result = subprocess.run(
+        [
+            sys.executable,
+            NODE_MODULES_PY,
+            "--legacy-container", "0",
+            "--cpio", "test.obscpio",
+            "--dry",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert "--cpio is not recommended" in result.stderr
+
+    # 4. Test falsy value 'disable'
+    result = subprocess.run(
+        [
+            sys.executable,
+            NODE_MODULES_PY,
+            "--legacy-container", "disable",
+            "--cpio", "test.obscpio",
+            "--dry",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert "--cpio is not recommended" in result.stderr
+
+    # 5. Test invalid value 'invalid_val'
+    result = subprocess.run(
+        [
+            sys.executable,
+            NODE_MODULES_PY,
+            "--legacy-container", "invalid_val",
+            "--cpio", "test.obscpio",
+            "--dry",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "Boolean value expected, got invalid_val" in result.stderr
+
+
 def test_node_dir_routing(tmp_path):
     """Verify that individual tarballs are routed into the specified node-dir when legacy-container is false."""
     parent_dir = tmp_path.parent
