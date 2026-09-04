@@ -29,40 +29,32 @@ externally download sources for use by `npm` during `rpmbuild`.
     locally so they are available during peer resolution in the VM. Without
     this you may get additional warnings during install.
 - Make sure to put the `package-lock.json` next to the spec file and
-  remove it from the sources. Sources should only have `package.json`,
+  remove it from the sources. Sources must have compatible `package.json`,
   even if they ship a compatible `package-lock.json`
-- Add the following line to the spec file:
-   ```
-   %include  %{_sourcedir}/node_modules.spec.inc
-   ```
 - Create file `_service` with the following content:
   ```xml
   <services>
-    <service name="node_modules" mode="manual">
-      <param name="output">node_modules.spec.inc</param>
-      <param name="source-offset">10000</param>
-    </service>
+    <service name="node_modules" mode="manual"/>
   </services>
   ```
 - `osc service manualrun`
   - this downloads the individual dependency tarballs into the `node_modules` directory and generates `node_modules.spec.inc`
-- `osc add node_modules`
-- `osc add node_modules.spec.inc`
-- `osc commit`
+- `git add node_modules _service`
+- `git commit`
 
 ### Example
 
   ```
   Source10:       package-lock.json
-  Source11:       node_modules.spec.inc
-  %include        %{_sourcedir}/node_modules.spec.inc
+  #!CreateArchive
+  Source11:       node_modules.tar.gz
   BuildRequires:  local-npm-registry
 
   [...]
 
   %prep
   %setup
-  local-npm-registry %{_sourcedir} install --also=dev
+  local-npm-registry %{_sourcedir}/node_modules install --also=dev
 
   [...]
 
@@ -78,7 +70,7 @@ If you need to package the downloaded NPM modules into a single archive (e.g., f
   ```xml
   <services>
     <service name="node_modules" mode="manual">
-      <param name="legacy-container">true</param>
+      <param name="legacy-container"/>
       <param name="cpio">node_modules.obscpio</param>
       <param name="output">node_modules.spec.inc</param>
       <param name="source-offset">10000</param>
@@ -94,10 +86,10 @@ If you need to package the downloaded NPM modules into a single archive (e.g., f
 ### Service Parameters
 
 - `input` (optional): The input package-lock.json file to parse. Defaults to `package-lock.json`.
-- `output` (optional): The file to write RPM source lines into.
-- `source-offset` (optional): The RPM source number to start with.
-- `legacy-container` (optional): If set to `true`, packages the downloaded files into a `.obscpio` archive (specified by `cpio`). If set to `false` (default), downloads files into a directory specified by `node-dir`.
 - `node-dir` (optional): The directory name to store individual tarballs in when `legacy-container` is `false`. Defaults to `node_modules`.
+- `output` (optional, legacy): The file to write RPM source lines into. Not supported with directories are SRC.RPM doesn't support directories
+- `source-offset` (optional, legacy): The RPM source number to start with. Legacy for same reason as above.
+- `legacy-container` (optional): If set to `true`, packages the downloaded files into a `.obscpio` archive (specified by `cpio`). If set to `false` (default), downloads files into a directory specified by `node-dir`.
 - `cpio` (optional, legacy): The cpio archive filename to store all tarballs in. This parameter can only be used if `legacy-container` is set to `true`.
 
 ### In Practice
