@@ -682,3 +682,145 @@ def test_include_file_sources_with_and_without_legacy_container(tmp_path):
     assert result_legacy.returncode == 0
     spec_content_legacy = (out_dir_legacy / "mock_legacy.spec").read_text()
     assert "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz#/ms-2.0.0.tgz" in spec_content_legacy
+
+
+def test_omit_optional_v2(tmp_path):
+    """Verify that --omit-optional filters out optional dependencies in a v2 package-lock."""
+    parent_dir = tmp_path.parent
+    lock_file = parent_dir / "package-lock.json"
+    lock_file.write_text("""{
+  "name": "v2-test",
+  "version": "1.0.0",
+  "lockfileVersion": 2,
+  "requires": true,
+  "dependencies": {
+    "ms": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz",
+      "integrity": "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A=="
+    },
+    "negotiator": {
+      "version": "0.6.3",
+      "resolved": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.3.tgz",
+      "integrity": "sha512-+EUsqGPLsM+j/zdChZjsnX51g4XrHFOIXwfnCVPGlQk/k5giakcKsuxCObBRu6DSm9opw/O6slWbJdghQM4bBg==",
+      "optional": true
+    }
+  }
+}""")
+
+    spec_file = parent_dir / "mock.spec"
+    spec_file.write_text("# NODE_MODULES BEGIN\n# NODE_MODULES END\n")
+
+    # 1. Run WITH --omit-optional
+    out_dir_omit = tmp_path / "out_omit"
+    out_dir_omit.mkdir()
+    result = subprocess.run(
+        [
+            sys.executable,
+            NODE_MODULES_PY,
+            "-i", "package-lock.json",
+            "--spec", "mock.spec",
+            "--node-dir", "node_modules",
+            "--omit-optional",
+            "--outdir", str(out_dir_omit),
+            "--download",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=parent_dir,
+    )
+    assert result.returncode == 0
+    assert (out_dir_omit / "node_modules" / "ms-2.0.0.tgz").is_file()
+    assert not (out_dir_omit / "node_modules" / "negotiator-0.6.3.tgz").exists()
+
+    # 2. Run WITHOUT --omit-optional
+    out_dir_include = tmp_path / "out_include"
+    out_dir_include.mkdir()
+    result = subprocess.run(
+        [
+            sys.executable,
+            NODE_MODULES_PY,
+            "-i", "package-lock.json",
+            "--spec", "mock.spec",
+            "--node-dir", "node_modules",
+            "--outdir", str(out_dir_include),
+            "--download",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=parent_dir,
+    )
+    assert result.returncode == 0
+    assert (out_dir_include / "node_modules" / "ms-2.0.0.tgz").is_file()
+    assert (out_dir_include / "node_modules" / "negotiator-0.6.3.tgz").is_file()
+
+
+def test_omit_optional_v3(tmp_path):
+    """Verify that --omit-optional filters out optional dependencies in a v3 package-lock."""
+    parent_dir = tmp_path.parent
+    lock_file = parent_dir / "package-lock.json"
+    lock_file.write_text("""{
+  "name": "v3-test",
+  "version": "1.0.0",
+  "lockfileVersion": 3,
+  "requires": true,
+  "packages": {
+    "node_modules/ms": {
+      "version": "2.0.0",
+      "resolved": "https://registry.npmjs.org/ms/-/ms-2.0.0.tgz",
+      "integrity": "sha512-Tpp60P6IUJDTuOq/5Z8cdskzJujfwqfOTkrwIwj7IRISpnkJnT6SyJ4PCPnGMoFjC9ddhal5KVIYtAt97ix05A=="
+    },
+    "node_modules/negotiator": {
+      "version": "0.6.3",
+      "resolved": "https://registry.npmjs.org/negotiator/-/negotiator-0.6.3.tgz",
+      "integrity": "sha512-+EUsqGPLsM+j/zdChZjsnX51g4XrHFOIXwfnCVPGlQk/k5giakcKsuxCObBRu6DSm9opw/O6slWbJdghQM4bBg==",
+      "optional": true
+    }
+  }
+}""")
+
+    spec_file = parent_dir / "mock.spec"
+    spec_file.write_text("# NODE_MODULES BEGIN\n# NODE_MODULES END\n")
+
+    # 1. Run WITH --omit-optional
+    out_dir_omit = tmp_path / "out_omit"
+    out_dir_omit.mkdir()
+    result = subprocess.run(
+        [
+            sys.executable,
+            NODE_MODULES_PY,
+            "-i", "package-lock.json",
+            "--spec", "mock.spec",
+            "--node-dir", "node_modules",
+            "--omit-optional",
+            "--outdir", str(out_dir_omit),
+            "--download",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=parent_dir,
+    )
+    assert result.returncode == 0
+    assert (out_dir_omit / "node_modules" / "ms-2.0.0.tgz").is_file()
+    assert not (out_dir_omit / "node_modules" / "negotiator-0.6.3.tgz").exists()
+
+    # 2. Run WITHOUT --omit-optional
+    out_dir_include = tmp_path / "out_include"
+    out_dir_include.mkdir()
+    result = subprocess.run(
+        [
+            sys.executable,
+            NODE_MODULES_PY,
+            "-i", "package-lock.json",
+            "--spec", "mock.spec",
+            "--node-dir", "node_modules",
+            "--outdir", str(out_dir_include),
+            "--download",
+        ],
+        capture_output=True,
+        text=True,
+        cwd=parent_dir,
+    )
+    assert result.returncode == 0
+    assert (out_dir_include / "node_modules" / "ms-2.0.0.tgz").is_file()
+    assert (out_dir_include / "node_modules" / "negotiator-0.6.3.tgz").is_file()
