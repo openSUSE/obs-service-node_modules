@@ -21,4 +21,5 @@ jobs:
           path: ~/.tox
           key: poetry-${{ hashFiles('poetry.lock') }}
 
+      - run: 'poetry install --no-root'
       - run: 'poetry run pytest -vv -n auto'
