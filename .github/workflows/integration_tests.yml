@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - "main"
+      - "master"
   pull_request:
 
 jobs:
@@ -13,12 +14,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-      - uses: Gr1N/setup-poetry@v7
-      - uses: actions/cache@v2
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+      - uses: Gr1N/setup-poetry@v9
+      - uses: actions/cache@v6
         with:
           path: ~/.tox
           key: poetry-${{ hashFiles('poetry.lock') }}
 
+      - run: 'poetry install --no-root'
       - run: 'poetry run pytest -vv -n auto'
