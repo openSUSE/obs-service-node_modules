@@ -97,3 +97,21 @@ https://build.opensuse.org/package/show/openSUSE:Factory/cockpit-podman
 
 ### External Resources
 https://github.com/openSUSE/npm-localhost-proxy
+
+## Testing
+
+To run the tests locally, you can use a virtual environment to install Poetry and the project dependencies:
+
+```bash
+# Create a virtual environment for poetry
+python3 -m venv poetryvenv
+
+# Install poetry into the virtual environment
+./poetryvenv/bin/pip install poetry
+
+# Install project dependencies
+./poetryvenv/bin/poetry install --no-root
+
+# Run the tests in parallel with verbose output
+./poetryvenv/bin/poetry run pytest -vv -n auto
+```
